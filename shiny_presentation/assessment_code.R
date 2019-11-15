@@ -1,41 +1,18 @@
----
-title: "Biostatistician Programmer Assessment"
-author: "Ruixuan Ma"
-date: "11/14/2019"
-output: html_document
----
+install.packages("tigris")
+install.packages("blscrapeR")
 
-package installation
-
-install.packages("tigris", repos = "http://cran.us.r-project.org")
-install.packages("blscrapeR", repos = "http://cran.us.r-project.org")
-
-```{r warning=FALSE, eval=FALSE}
-
-install.packages("tigris", repos = "http://cran.us.r-project.org")
-install.packages("blscrapeR", repos = "http://cran.us.r-project.org")
-
-library(sp)
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(tigris)
 library(blscrapeR)
 library(leaflet)
-```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r warning=FALSE, message=FALSE}
-
-library(dplyr)
+######### 1. The Data ############
 
 # go to https://data.census.gov/ to extract population data for each county of FL from table S0101: Age and Sex with 2012-2016 5-years estimate
-rawPop <- read.csv("C:/Users/rxm1279/Desktop/Layla assessment/FLpopulation.csv")
+rawPop <- read.csv('/Users/maruixuan/Documents/GitHub/HeartAttack_Commute45/shiny_presentation/FLpopulation.csv')
 
 #remove irrelevant rows 
 pop_rm_rows <- rawPop[-c(1, 69), ]
@@ -49,28 +26,22 @@ dt_pop <- pop_rm_rows %>%
   rename(countyFIPS = GEO_ID) %>%
   rename(countyPop = S0101_C01_001E)
 
-head(dt_pop)
-```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r}
+########## 2. Calculate Rates ##########
 
 # read commute over 45 min data
-dt_com45 <- read.csv("C:/Users/rxm1279/Desktop/Layla assessment/commuteTime45_2012_16.csv")
+dt_com45 <- read.csv('/Users/maruixuan/Documents/GitHub/HeartAttack_Commute45/shiny_presentation/commuteTime45_2012_16.csv')
 
 # convert factor to numeric
 dt_com45$Value <- as.numeric(gsub(",", "", as.character(dt_com45$Value)))
-
+class(dt_com45$Value)
 
 # read heart attack data
-dt_ha <- read.csv("C:/Users/rxm1279/Desktop/Layla assessment/heartAttackER_2012_16.csv")
+dt_ha <- read.csv('/Users/maruixuan/Documents/GitHub/HeartAttack_Commute45/shiny_presentation/heartAttackER_2012_16.csv')
 
 # convert factor to numeric
 dt_ha$Value <- as.numeric(gsub(",", "", as.character(dt_ha$Value)))
-
+class(dt_ha$Value)
 
 # get mean of numbers of people in each county for 5 years estimate for grouped heartAttack data
 mean_5year<- dt_ha %>%
@@ -102,15 +73,12 @@ reportDt <- mergeDt %>%
   filter(countyFIPS == 12011 | countyFIPS ==12086 | countyFIPS == 12087 | countyFIPS == 12099) %>%
   select("NAME", "hospRate", "commRate")
 
-knitr::kable(reportDt)
-```
+# save merged data as rds file, to use as a data source in shiny
+saveRDS(mergeDt, file = "mergeDt.rds")
 
-## graphing correlates of commute time and heart attack
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-```{r message=FALSE}
-library(ggplot2)
+############ 3. graphing correlates of commute time and heart attack ##########
 
 # create scatter plot for exploring relationship between long commute time and heart attack
 com_ha_plot <- ggplot(mergeDt, aes(x = num_45 , y = num_ha)) + geom_point(color = "#69b3a2") +
@@ -120,29 +88,12 @@ com_ha_plot <- ggplot(mergeDt, aes(x = num_45 , y = num_ha)) + geom_point(color 
   theme_classic()
 
 plot(com_ha_plot)
-```
 
 
+########### 4. Mapping Estimates ##############
 
-## mapping estimates
-
-```{r}
-
-library(tigris)
-
-
+#download Florida counties boundary files using tigris package
 fl <- counties(12, cb = TRUE, year = 2016)
-```
-
-```{r message=FALSE, warning=FALSE}
-
-library(sp)
-library(tidyverse)
-library(dplyr)
-library(ggplot2)
-library(tigris)
-library(blscrapeR)
-library(leaflet)
 
 #calculate the rounded ratio of heart attack / long time commute for all FL counties.
 mapRatio <- mergeDt %>%
@@ -154,9 +105,10 @@ mapRatio <- mergeDt %>%
 #convert numeric to character
 mapRatio$GEOID = as.character(mapRatio$GEOID)
 
-
+#merge ratio dataset with spatial object
 leafmap <- geo_join(fl, mapRatio, by = "GEOID")
 
+#format popup data for leaflet map and click the counties on map to check the specific ratio
 popup_dat <- paste0("<strong>County: </strong>", 
                     leafmap$NAME, 
                     "<br><strong>Heart Attacks / Long Commute: </strong>", 
@@ -176,4 +128,11 @@ leaflet(data = leafmap) %>% addTiles() %>%
             values  = leafmap$ratio,
             position = "bottomleft",
             title = "Heart Attacks / Long Commute ")
-```
+
+
+
+
+
+
+
+
